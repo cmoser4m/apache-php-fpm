@@ -88,5 +88,4 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
 RUN php composer-setup.php
 RUN php -r "unlink('composer-setup.php');"
 
-
-RUN /bin/bash
+CMD ["bash", "-c", "php-fpm ; /usr/local/apache2/bin/apachectl -D FOREGROUND"]
