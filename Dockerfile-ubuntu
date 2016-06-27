@@ -1,0 +1,74 @@
+FROM ubuntu:latest
+EXPOSE 80
+EXPOSE 443
+
+RUN apt-get update
+RUN apt-get -y upgrade
+RUN apt-get -y install unzip bzip2 build-essential libmcrypt4 libmcrypt-dev zlib1g zlib1g-dev openssl libssl-dev libxml2-dev libcurl4-openssl-dev libjpeg-dev libpng12-dev libpspell-dev autoconf libpcre3-dev sendmail sendmail-bin curl git libaio1
+
+# RUN adduser --system --home /home/www --disabled-login --group www
+RUN adduser --system --home /home/www --group www
+
+WORKDIR /root
+
+COPY apr-1.5.2.tar.gz /root
+COPY apr-util-1.5.4.tar.gz /root
+COPY httpd-2.4.20.tar.gz /root
+COPY php-7.0.6.tar.gz /root
+
+#COPY instantclient-basic-linux.x64-12.1.0.2.0.zip /root
+#COPY instantclient-sdk-linux.x64-12.1.0.2.0.zip /root
+
+RUN tar zxvf apr-1.5.2.tar.gz && tar zxvf apr-util-1.5.4.tar.gz && tar zxvf httpd-2.4.20.tar.gz && tar zxvf php-7.0.6.tar.gz
+#RUN unzip instantclient-basic-linux.x64-12.1.0.2.0.zip && unzip instantclient-sdk-linux.x64-12.1.0.2.0.zip
+
+WORKDIR /root/apr-1.5.2
+RUN ./configure && make && make install
+
+WORKDIR /root/apr-util-1.5.4
+RUN ./configure --with-apr=/usr/local/apr && make && make install
+
+# Apache httpd install and configuration
+WORKDIR /root/httpd-2.4.20
+RUN ./configure --enable-ssl && make && make install
+RUN /usr/local/apache2/bin/apxs -ea -n proxy mod_proxy.so
+RUN /usr/local/apache2/bin/apxs -ea -n proxy_fcgi mod_proxy_fcgi.so
+RUN /usr/local/apache2/bin/apxs -ea -n rewrite mod_rewrite.so
+RUN echo "Include \"home/www/httpd.conf\"" >> /usr/local/apache2/conf/httpd.conf
+#RUN echo "AddType application/x-httpd-php .php" >> httpd.conf
+#RUN echo "LoadModule ssl_module modules/mod_ssl.so" >> httpd.conf
+#RUN echo "Listen 443" >> httpd.conf
+
+
+WORKDIR /root/php-7.0.6
+RUN ./configure --with-curl --with-zlib --with-openssl --enable-mbstring=all --with-mcrypt --enable-fpm --with-fpm-user=www --with-fpm-group=www --exec-prefix=/usr/local --enable-zip && make -j 4 && make install
+
+WORKDIR /root/php-7.0.6/sapi/fpm
+RUN cp init.d.php-fpm /etc/init.d/php-fpm
+RUN chmod +x /etc/init.d/php-fpm
+
+#WORKDIR /root/instantclient_12_1
+#RUN ln -s libclntsh.so.12.1 libclntsh.so
+
+#WORKDIR /root
+#RUN mv /root/instantclient_12_1 /usr/local/instantclient
+#RUN echo "/usr/local/instantclient" >> /etc/ld.so.conf.d/instantclient.conf
+
+#WORKDIR /root/php-5.3.29/ext/oci8
+#RUN phpize && ./configure --with-oci8=instantclient,/usr/local/instantclient && make && make install
+
+#WORKDIR /root
+#RUN echo "" | pecl install mongo
+
+#COPY conf/php.ini /usr/local/lib/php.ini
+
+COPY php-fpm.conf /usr/local/etc/php-fpm.conf
+
+
+WORKDIR /usr/local/bin
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+RUN php -r "if (hash_file('SHA384', 'composer-setup.php') === '070854512ef404f16bac87071a6db9fd9721da1684cd4589b1196c3faf71b9a2682e2311b36a5079825e155ac7ce150d') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+RUN php composer-setup.php
+RUN php -r "unlink('composer-setup.php');"
+
+RUN /bin/bash
