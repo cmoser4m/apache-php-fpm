@@ -54,26 +54,11 @@ RUN /usr/local/apache2/bin/apxs -ea -n proxy mod_proxy.so
 RUN /usr/local/apache2/bin/apxs -ea -n proxy_fcgi mod_proxy_fcgi.so
 RUN /usr/local/apache2/bin/apxs -ea -n rewrite mod_rewrite.so
 
-# add additional Listen directive for port 443 (https)
-RUN echo "Listen 443" >> httpd.conf
-
-# activate httpd.conf in the /home/www directory (all projects should have httpd.conf)
-RUN echo "Include \"/home/www/app/httpd.conf\"" >> /usr/local/apache2/conf/httpd.conf
-
 #### PHP AND RELATED
 
 # build php
 WORKDIR /root/build/php-7.0.6
 RUN ./configure --with-curl --with-zlib --with-openssl --enable-mbstring=all --with-mcrypt --enable-fpm --with-fpm-user=www --with-fpm-group=www --exec-prefix=/usr/local --enable-zip && make -j 4 && make install
-
-# copy php-fpm init scripts
-WORKDIR /root/build/php-7.0.6/sapi/fpm
-RUN cp init.d.php-fpm /etc/init.d/php-fpm
-RUN chmod +x /etc/init.d/php-fpm
-
-# copy php-fpm.conf and php.ini files
-COPY php-fpm.conf /usr/local/etc/php-fpm.conf
-COPY php.ini /usr/local/lib/php.ini
 
 #### PHP EXTENSIONS (PDO_OCI and PCNTL)
 WORKDIR /root/build/php-7.0.6/ext/pdo_oci
