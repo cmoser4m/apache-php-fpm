@@ -93,4 +93,5 @@ RUN php -r "unlink('composer-setup.php');"
 #### SUPERVISORD
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/bin/supervisord"]
+CMD ["-c", "/etc/supervisor/conf.d/supervisord.conf"]
