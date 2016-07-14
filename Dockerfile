@@ -5,14 +5,14 @@ EXPOSE 443
 # update CentOS packages
 RUN yum -y update
 
-# devl tools required for compiling
+# dev tools required for compiling
 RUN yum -y groupinstall "Development Tools"
 
 # install the EPEL repositories (Extra Packages for Enterprise Linux), required for libmcrypt and other packages - see http://fedoraproject.org/wiki/EPEL
 RUN yum -y install epel-release
 
 # install required packages
-RUN yum -y install libmcrypt libmcrypt-devel zlib zlib-devel openssl openssl-devel libxml2 libxml2-devel libcurl libcurl-devel libpng libpng-devel pcre-devel libaio
+RUN yum -y install libmcrypt libmcrypt-devel zlib zlib-devel openssl openssl-devel libxml2 libxml2-devel libcurl libcurl-devel libpng libpng-devel pcre-devel libaio supervisor
 
 # create the www user
 RUN adduser --system --create-home www && mkdir /home/www/tmp && chown -R www.www /home/www/tmp
@@ -39,15 +39,15 @@ RUN echo "/usr/local/instantclient" >> /etc/ld.so.conf.d/instantclient.conf
 
 # build apr (required for compiling apache)
 WORKDIR /root/build/apr-1.5.2
-RUN ./configure && make && make install
+RUN ./configure && make -j 4 && make install
 
 # build apr-util (required for compiling apache)
 WORKDIR /root/build/apr-util-1.5.4
-RUN ./configure --with-apr=/usr/local/apr && make && make install
+RUN ./configure --with-apr=/usr/local/apr && make -j 4 && make install
 
 # build apache httpd
 WORKDIR /root/build/httpd-2.4.20
-RUN ./configure --enable-ssl && make && make install
+RUN ./configure --enable-ssl && make -j 4 && make install
 
 # enable required apache modules
 RUN /usr/local/apache2/bin/apxs -ea -n proxy mod_proxy.so
@@ -60,12 +60,16 @@ RUN /usr/local/apache2/bin/apxs -ea -n rewrite mod_rewrite.so
 WORKDIR /root/build/php-7.0.6
 RUN ./configure --with-curl --with-zlib --with-openssl --enable-mbstring=all --with-mcrypt --enable-fpm --with-fpm-user=www --with-fpm-group=www --exec-prefix=/usr/local --enable-zip && make -j 4 && make install
 
+# default php-fpm.conf and php.ini files
+COPY php-fpm.conf /usr/local/etc/php-fpm.conf
+COPY php.ini /usr/local/lib/php.ini
+
 #### PHP EXTENSIONS (PDO_OCI and PCNTL)
 WORKDIR /root/build/php-7.0.6/ext/pdo_oci
-RUN phpize && ./configure --with-pdo-oci=instantclient,/usr/local/instantclient,12.1 && make && make install
+RUN phpize && ./configure --with-pdo-oci=instantclient,/usr/local/instantclient,12.1 && make -j 4 && make install
 
 WORKDIR /root/build/php-7.0.6/ext/pcntl
-RUN phpize && ./configure && make && make install
+RUN phpize && ./configure && make -j 4 && make install
 
 #### COMPOSER
 WORKDIR /usr/local/bin
@@ -73,4 +77,7 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
 RUN php composer-setup.php
 RUN php -r "unlink('composer-setup.php');"
 
-CMD ["bash", "-c", "php-fpm ; /usr/local/apache2/bin/apachectl -D FOREGROUND"]
+#### SUPERVISORD
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+CMD ["/usr/bin/supervisord"]
